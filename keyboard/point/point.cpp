@@ -1,75 +1,89 @@
+#include <unistd.h>
+
 #include <iostream>
 
 #include <SFML/Graphics.hpp>
 
+#include <X11/Xlib.h>
+
 #define HEIGHT 800
 #define WIDTH 600
 
-#define ABS(x) ((x < 0) ? -x : x)
-
 bool isRunning = true;
-int x = HEIGHT / 2;
-int y = WIDTH / 2;
+struct s_point {
+    int x;
+    int y;
+};
+struct s_point point = { HEIGHT / 2, WIDTH / 2 };
 
-int handleKeyboardEvent(sf::Event::KeyEvent &e)
+int move(int x, int y)
 {
-    x = x + HEIGHT;
-    y = y + WIDTH;
-    switch (e.code) {
-    case sf::Keyboard::Escape: {
-        isRunning = false;
-    } break;
-    case sf::Keyboard::Right: {
-        x = x + 10;
-    } break;
-    case sf::Keyboard::Left: {
-        x = x - 10;
-    } break;
-    case sf::Keyboard::Down: {
-        y = y + 10;
-    } break;
-    case sf::Keyboard::Up: {
-        y = y - 10;
-    } break;
-    }
-    x = x % HEIGHT;
-    y = y % WIDTH;
-    std::cout << "(" << x << ", " << y << ")" << std::endl;;
+    int xx, yy;
+    xx = HEIGHT;
+    yy = WIDTH;
+    xx = xx + point.x + x;
+    yy = yy + point.y + y;
+    // bounds
+    point.x = xx % HEIGHT;
+    point.y = yy % WIDTH;
+    std::cout << "(" << point.x << ", " << point.y << ")" << std::endl;
     return 0;
 }
 
-int handleEvent(sf::Event &e)
+int readKeyboard(int delta)
 {
-    if (e.type == sf::Event::Closed) {
-        isRunning = false;
-        return 0;
+    int x, y;
+    while (isRunning) {
+        x = 0;
+        y = 0;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Escape)) {
+            isRunning = false;
+            break;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
+            x = 1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
+            x = -1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) {
+            y = 1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up)) {
+            y = -1;
+        }
+        if (x != 0 || y != 0)
+            move(x, y);
+        usleep(200);
     }
-    if (e.type == sf::Event::KeyPressed)
-        handleKeyboardEvent(e.key);
     return 0;
 }
 
 int main()
 {
+    XInitThreads();
+
     sf::RenderWindow window(sf::VideoMode(HEIGHT, WIDTH), "point window");
     sf::Event event;
     sf::CircleShape circle(10.f);
+    sf::Thread keyboardThread(&readKeyboard, 0);
 
+    window.setActive(false);
     circle.setFillColor(sf::Color::Red);
-    circle.setPosition(x, y);
+    circle.setPosition(point.x, point.y);
+    keyboardThread.launch();
 
     while (isRunning) {
         window.clear(sf::Color::Black);
 
-        while (window.pollEvent(event)) {
-            handleEvent(event);
-        }
-
-        circle.setPosition(x, y);
+        circle.setPosition(point.x, point.y);
 
         window.draw(circle);
         window.display();
     }
+
+    keyboardThread.terminate();
+    keyboardThread.wait();
 
     return 0;
 }
